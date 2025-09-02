@@ -1,0 +1,16 @@
+# Jupyter Notebook
+.ipynb_checkpoints/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Docker
+.dockerignore
+.env
+
+# IDE
+.idea/
+.vscode/
