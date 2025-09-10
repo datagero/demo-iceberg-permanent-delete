@@ -21,7 +21,7 @@ The demonstration covers the following steps:
 
 ### Option 1: Gitpod (Recommended)
 
-[![Open in Gitpod](https://gitpod.io/button/open-in-gitpod.svg)](https://gitpod.io/#https://github.com/your-username/demo-minio-iceberg)
+[![Open in Gitpod](https://gitpod.io/button/open-in-gitpod.svg)](https://gitpod.io/#https://github.com/datagero/demo-iceberg-permanent-delete)
 
 1.  **Click "Open in Gitpod"** above - services start automatically
 2.  **Open MinIO Console** at http://localhost:9001 (admin/password) to explore storage
