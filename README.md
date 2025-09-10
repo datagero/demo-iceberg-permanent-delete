@@ -19,6 +19,17 @@ The demonstration covers the following steps:
 
 ## Running the Demo
 
+### Option 1: Gitpod (Recommended)
+
+[![Open in Gitpod](https://gitpod.io/button/open-in-gitpod.svg)](https://gitpod.io/#https://github.com/your-username/demo-minio-iceberg)
+
+1.  **Click "Open in Gitpod"** above - services start automatically
+2.  **Open MinIO Console** at http://localhost:9001 (admin/password) to explore storage
+3.  **Open Jupyter** at http://localhost:8888 and run `iceberg_pii_deletion_demo.ipynb`
+4.  **Watch storage changes** in MinIO as you execute each notebook cell
+
+### Option 2: Local Setup
+
 1.  **Start the services**:
     ```bash
     docker-compose up -d
@@ -42,6 +53,17 @@ The demonstration covers the following steps:
     docker-compose down
     ```
 
+## Storage Layer Exploration
+
+**For the best learning experience**, keep the MinIO console open while running the notebook to observe how Iceberg manages data:
+
+- **Before starting**: Check that the `warehouse` bucket is empty
+- **During table creation**: Watch metadata files appear
+- **During data seeding**: Observe Parquet files being created  
+- **During PII deletion**: See new snapshots and metadata updates
+- **During maintenance**: Watch old files being removed and new ones created
+
+This real-time exploration shows why simple SQL `DELETE` isn't enough for PII compliance in Iceberg.
 
 # Extra JAR Dependencies for Spark + Iceberg + MinIO
 
