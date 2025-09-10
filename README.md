@@ -47,7 +47,6 @@ The demonstration covers the following steps:
 
 Spark-Iceberg images do **not** include:
 - **Hadoop S3A** → required to use `s3://` with MinIO/S3.
-- **Iceberg runtime (Actions API)** → required for features like `DeleteOrphanFiles`.
 
 ## Required JARs
 

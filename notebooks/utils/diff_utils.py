@@ -6,7 +6,7 @@ import pandas as pd
 import numpy as np
 
 
-def diff_summaries(df_old: pd.DataFrame, df_new: pd.DataFrame, count_col: str = "files_created") -> pd.DataFrame:
+def diff_summaries(df_old: pd.DataFrame, df_new: pd.DataFrame, count_col: str = "files_in_catalog") -> pd.DataFrame:
     """
     Compare two file summary DataFrames and return a diff showing changes.
     
