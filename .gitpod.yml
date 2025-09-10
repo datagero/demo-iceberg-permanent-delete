@@ -1,76 +1,74 @@
-# Use Gitpod's default workspace with Docker Compose
 image: gitpod/workspace-full
 
 ports:
   - port: 8888
     name: Jupyter Notebook
-    description: Jupyter notebook server for running the Iceberg PII deletion demo
     onOpen: open-preview
+    visibility: public
   - port: 9001
     name: MinIO Console
-    description: MinIO web console for S3-compatible storage management
     onOpen: open-preview
+    visibility: public
   - port: 8080
     name: Spark UI
-    description: Apache Spark web UI for monitoring jobs
     onOpen: open-preview
+    visibility: public
   - port: 8181
     name: Iceberg REST
-    description: Apache Iceberg REST catalog service
     onOpen: open-preview
+    visibility: public
 
 tasks:
   - name: Download JAR Dependencies
     init: |
-      echo "📦 Downloading required JAR dependencies..."
+      echo "Downloading JAR dependencies..."
       mkdir -p jars
-      
-      # Download Hadoop S3A JAR (matching Hadoop 3.3.4 in container)
-      curl -L -o jars/hadoop-aws-3.3.4.jar \
-        https://repo1.maven.org/maven2/org/apache/hadoop/hadoop-aws/3.3.4/hadoop-aws-3.3.4.jar
-      
-      # Download AWS Java SDK Bundle
-      curl -L -o jars/aws-java-sdk-bundle-1.12.262.jar \
-        https://repo1.maven.org/maven2/com/amazonaws/aws-java-sdk-bundle/1.12.262/aws-java-sdk-bundle-1.12.262.jar
-      
-      echo "✅ JAR dependencies downloaded successfully!"
+      curl -L -o jars/hadoop-aws-3.3.4.jar https://repo1.maven.org/maven2/org/apache/hadoop/hadoop-aws/3.3.4/hadoop-aws-3.3.4.jar
+      curl -L -o jars/aws-java-sdk-bundle-1.12.262.jar https://repo1.maven.org/maven2/com/amazonaws/aws-java-sdk-bundle/1.12.262/aws-java-sdk-bundle-1.12.262.jar
+      echo "JAR dependencies downloaded successfully!"
 
   - name: Start Services
     init: |
-      echo "🚀 Starting Iceberg PII Deletion Demo services..."
+      echo "Starting services..."
       docker-compose up -d
-      echo "⏳ Waiting for services to be ready..."
       sleep 15
-      echo "✅ Services started! Access the demo at:"
-      echo "   📓 Jupyter Notebook: http://localhost:8888"
-      echo "   🗄️  MinIO Console: http://localhost:9001 (admin/password)"
-      echo "   ⚡ Spark UI: http://localhost:8080"
-      echo "   🧊 Iceberg REST: http://localhost:8181"
+      echo "Services started!"
+      echo "Jupyter Notebook: http://localhost:8888"
+      echo "MinIO Console: http://localhost:9001 (admin/password)"
+      echo "Spark UI: http://localhost:8080"
+      echo "Iceberg REST: http://localhost:8181"
       echo ""
-      echo "🔍 MinIO Exploration:"
-      echo "   1. Open MinIO Console at http://localhost:9001"
-      echo "   2. Login with admin/password"
-      echo "   3. Navigate to the 'warehouse' bucket"
-      echo "   4. Keep it open while running the Jupyter notebook"
-      echo "   5. Watch files appear and disappear as you run each cell"
+      echo "Opening Jupyter notebook in preview..."
+      sleep 5
     command: |
-      # Keep the services running and show logs
-      docker-compose logs -f
+      docker-compose logs -f &
+      sleep 10
+      echo "Click on the Jupyter Notebook tab above to open the notebook interface"
+      wait
+
+  - name: Open Iceberg PII Demo Notebook
+    init: |
+      echo "Preparing to open Iceberg PII Deletion Demo notebook..."
+    command: |
+      ./open_notebook.sh
+
+  - name: Auto-open Notebook
+    init: |
+      echo "Setting up automatic notebook opening..."
+    command: |
+      # Wait for all services to be ready
+      sleep 60
+      # Open the notebook automatically
+      echo "Auto-opening the Iceberg PII Deletion Demo notebook..."
+      gp preview "https://${GITPOD_WORKSPACE_URL#https://}notebooks/iceberg_pii_deletion_demo.ipynb" &
+      echo "Notebook should now be open in your browser!"
 
 vscode:
   extensions:
     - ms-python.python
     - ms-toolsai.jupyter
-    - redhat.java
-    - vscjava.vscode-java-pack
-    - ms-vscode.vscode-docker
-    - ms-kubernetes-tools.vscode-kubernetes-tools
 
-# Environment variables
 env:
-  - name: AWS_ACCESS_KEY_ID
-    value: admin
-  - name: AWS_SECRET_ACCESS_KEY
-    value: password
-  - name: AWS_REGION
-    value: us-east-1
+  AWS_ACCESS_KEY_ID: admin
+  AWS_SECRET_ACCESS_KEY: password
+  AWS_REGION: us-east-1

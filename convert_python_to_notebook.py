@@ -58,15 +58,26 @@ def parse_python_file(file_path):
         # Add line to current cell
         if current_cell_type:
             if current_cell_type == 'markdown':
-                # Remove markdown comment prefix
+                # Handle markdown comment lines
                 if line.startswith('# '):
+                    # Line with content: "# text" -> "text"
                     current_cell.append(line[2:])
+                elif line == '#':
+                    # Empty line: "#" -> ""
+                    current_cell.append('')
                 elif line.startswith('#'):
+                    # Other comment lines: "#text" -> "text"
                     current_cell.append(line[1:])
                 else:
+                    # Non-comment lines (shouldn't happen in markdown cells)
                     current_cell.append(line)
             else:  # code
                 current_cell.append(line)
+        else:
+            # If we're not in a cell yet, skip empty lines at the beginning
+            if line.strip() or current_cell:
+                current_cell.append(line)
+                current_cell_type = 'code'  # Default to code if no marker found
         
         i += 1
     
@@ -88,8 +99,12 @@ def create_notebook_cells(parsed_cells):
         if cell['type'] == 'markdown':
             # For markdown, split by newlines to create proper array
             markdown_content = cell['content']
-            # Split into lines, preserving empty lines
             lines = markdown_content.split('\n')
+            
+            # Don't remove empty lines for markdown - they're important for formatting
+            # Just ensure we have at least one line
+            if not lines:
+                lines = [""]
             
             notebook_cell = {
                 "cell_type": "markdown",
@@ -100,6 +115,16 @@ def create_notebook_cells(parsed_cells):
             # For code, also split by newlines
             code_content = cell['content']
             lines = code_content.split('\n') if code_content else [""]
+            
+            # Clean up empty lines at the beginning and end for code
+            while lines and not lines[0].strip():
+                lines.pop(0)
+            while lines and not lines[-1].strip():
+                lines.pop()
+            
+            # Ensure we have at least one line
+            if not lines:
+                lines = [""]
             
             notebook_cell = {
                 "cell_type": "code",
@@ -147,7 +172,7 @@ def create_notebook(notebook_cells):
 def main():
     """Main function to convert Python file to Jupyter notebook."""
     if len(sys.argv) != 3:
-        print("Usage: python convert_python_to_notebook_fixed.py <input_py_file> <output_ipynb_file>")
+        print("Usage: python convert_python_to_notebook.py <input_py_file> <output_ipynb_file>")
         sys.exit(1)
     
     input_file = sys.argv[1]
