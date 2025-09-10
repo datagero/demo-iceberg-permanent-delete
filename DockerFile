@@ -1,0 +1,21 @@
+# Use an official Spark base image for the correct Spark, Scala, and Java versions
+FROM apache/spark:3.5.5-scala2.12-java17-python3-ubuntu
+
+# Define versions as arguments for easy updates
+ARG ICEBERG_VERSION=1.9.2
+ARG HADOOP_AWS_VERSION=3.3.4
+ARG AWS_SDK_VERSION=2.17.257
+
+# Switch to root to install dependencies, then back to spark user
+USER root
+RUN apt-get update && apt-get install -y wget && rm -rf /var/lib/apt/lists/*
+USER ${spark_uid}
+
+# Download the required JARs directly into the Spark jars directory
+WORKDIR /opt/spark/jars
+RUN wget https://repo1.maven.org/maven2/org/apache/iceberg/iceberg-spark-runtime-3.5_2.12/${ICEBERG_VERSION}/iceberg-spark-runtime-3.5_2.12-${ICEBERG_VERSION}.jar
+RUN wget https://repo1.maven.org/maven2/org/apache/hadoop/hadoop-aws/${HADOOP_AWS_VERSION}/hadoop-aws-${HADOOP_AWS_VERSION}.jar
+RUN wget https://repo1.maven.org/maven2/software/amazon/awssdk/bundle/${AWS_SDK_VERSION}/bundle-${AWS_SDK_VERSION}.jar
+
+# Set the working directory for the container
+WORKDIR /opt/spark/work-dir

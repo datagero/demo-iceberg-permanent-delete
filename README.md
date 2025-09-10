@@ -41,3 +41,31 @@ The demonstration covers the following steps:
     ```bash
     docker-compose down
     ```
+
+
+# Extra JAR Dependencies for Spark + Iceberg + MinIO
+
+Spark-Iceberg images do **not** include:
+- **Hadoop S3A** → required to use `s3://` with MinIO/S3.
+- **Iceberg runtime (Actions API)** → required for features like `DeleteOrphanFiles`.
+
+## Required JARs
+
+### Hadoop S3A (match Hadoop 3.3.4 in container)
+```bash
+mkdir -p jars
+
+curl -L -o jars/hadoop-aws-3.3.4.jar \
+  https://repo1.maven.org/maven2/org/apache/hadoop/hadoop-aws/3.3.4/hadoop-aws-3.3.4.jar
+
+curl -L -o jars/aws-java-sdk-bundle-1.12.262.jar \
+  https://repo1.maven.org/maven2/com/amazonaws/aws-java-sdk-bundle/1.12.262/aws-java-sdk-bundle-1.12.262.jar
+````
+
+## Mount in `docker-compose.yml`
+
+```yaml
+volumes:
+  - ./jars/hadoop-aws-3.3.4.jar:/opt/spark/jars/hadoop-aws-3.3.4.jar:ro
+  - ./jars/aws-java-sdk-bundle-1.12.262.jar:/opt/spark/jars/aws-java-sdk-bundle-1.12.262.jar:ro
+```

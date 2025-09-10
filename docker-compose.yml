@@ -10,16 +10,35 @@ services:
     volumes:
       - ./warehouse:/home/iceberg/warehouse
       - ./notebooks:/home/iceberg/notebooks
+
+      # # S3A jars
+      - ./jars/hadoop-aws-3.3.4.jar:/opt/spark/jars/hadoop-aws-3.3.4.jar:ro
+      - ./jars/aws-java-sdk-bundle-1.12.262.jar:/opt/spark/jars/aws-java-sdk-bundle-1.12.262.jar:ro
+
     environment:
       - AWS_ACCESS_KEY_ID=admin
       - AWS_SECRET_ACCESS_KEY=password
       - AWS_REGION=us-east-1
-      - SPARK_CONF_spark.jars.packages=org.apache.hadoop:hadoop-aws:3.3.2,org.apache.hadoop:hadoop-common:3.3.2
+
+      # Use Spark's package manager to fetch correct, compatible JARs
+      - SPARK_CONF_spark.jars.packages=org.apache.iceberg:iceberg-spark-runtime-3.5_2.12:1.9.2,org.apache.hadoop:hadoop-aws:3.3.4,software.amazon.awssdk:bundle:2.17.257
+
+      # Iceberg Spark Extensions and Catalog Configuration
+      - SPARK_CONF_spark.sql.extensions=org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions
+      - SPARK_CONF_spark.sql.catalog.demo=org.apache.iceberg.spark.SparkCatalog
+      - SPARK_CONF_spark.sql.catalog.demo.catalog-impl=org.apache.iceberg.rest.RESTCatalog
+      - SPARK_CONF_spark.sql.catalog.demo.uri=http://rest:8181
+      - SPARK_CONF_spark.sql.catalog.demo.warehouse=s3://warehouse/
+
+      # ✅ Map s3:// to S3A (your Iceberg warehouse is s3://…)
+      - SPARK_CONF_spark.hadoop.fs.s3.impl=org.apache.hadoop.fs.s3a.S3AFileSystem
+      - SPARK_CONF_spark.hadoop.fs.AbstractFileSystem.s3.impl=org.apache.hadoop.fs.s3a.S3A
+
+      # MinIO/S3A settings
       - SPARK_CONF_spark.hadoop.fs.s3a.endpoint=http://minio:9000
       - SPARK_CONF_spark.hadoop.fs.s3a.path.style.access=true
       - SPARK_CONF_spark.hadoop.fs.s3a.access.key=admin
       - SPARK_CONF_spark.hadoop.fs.s3a.secret.key=password
-      - SPARK_CONF_spark.hadoop.fs.s3a.impl=org.apache.hadoop.fs.s3a.S3AFileSystem
       - SPARK_CONF_spark.hadoop.fs.s3a.connection.ssl.enabled=false
       - SPARK_CONF_spark.hadoop.fs.s3a.aws.credentials.provider=org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider
     ports:
