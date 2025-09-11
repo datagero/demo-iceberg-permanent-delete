@@ -9,7 +9,7 @@ The demonstration covers the following steps:
 2.  **Table Creation**: A sample Iceberg table is created with a schema containing PII columns.
 3.  **Data Seeding**: The table is populated with dummy data.
 4.  **PII Deletion**: A function is executed to "erase" PII for a specific record. This is done by two methods: deleting a row and/or updating the PII columns to `NULL`.
-5.  **Table Maintenance**: Iceberg maintenance operations (`expire_snapshots` and `rewrite_data_files`) are run to make the old data and snapshots unavailable and to remove the underlying data files containing the PII.
+5.  **Table Maintenance**: Iceberg maintenance operations (`expire_snapshots`, `remove_orphan_files` and in some cases `rewrite_data_files`) are run to make the old data and snapshots unavailable and to remove the underlying data files containing the PII.
 6.  **Validation**: We verify that the PII has been permanently removed by attempting to time-travel to a state before the deletion.
 
 ## Prerequisites
@@ -19,7 +19,7 @@ The demonstration covers the following steps:
 
 ## Running the Demo
 
-### Option 1: Gitpod (Recommended)
+### Quick Start
 
 [![Open in Gitpod](https://gitpod.io/button/open-in-gitpod.svg)](https://gitpod.io/#https://github.com/datagero/demo-iceberg-permanent-delete)
 
@@ -28,7 +28,86 @@ The demonstration covers the following steps:
 3.  **Open Jupyter** at http://localhost:8888 and run `iceberg_pii_deletion_demo.ipynb`
 4.  **Watch storage changes** in MinIO as you execute each notebook cell
 
-### Option 2: Local Setup
+## Storage Layer Exploration
+
+**For the best learning experience**, keep the MinIO console open while running the notebook to observe how Iceberg manages data:
+
+- **Before starting**: Check that the `warehouse` bucket is empty
+- **During table creation**: Watch metadata files appear
+- **During data seeding**: Observe Parquet files being created  
+- **During PII deletion**: See new snapshots and metadata updates
+- **During maintenance**: Watch old files being removed and new ones created
+
+This real-time exploration shows why simple SQL `DELETE` or `UPDATE` isn't enough for PII compliance in Iceberg.
+
+## Key Takeaways: Why Simple DELETE Isn't Enough
+
+Iceberg's time travel feature means deleted data can still be accessed through historical snapshots. For PII compliance, you need **permanent deletion** using Iceberg maintenance operations.
+
+## Permanent Deletion Commands
+
+### Step 0: Logical Deletion (All Tables)
+Choose one approach based on your needs:
+
+**Option A: Update PII columns to NULL**
+```sql
+UPDATE your_table SET pii_column = NULL WHERE condition;
+```
+
+**Option B: Delete entire rows**
+```sql
+DELETE FROM your_table WHERE condition;
+```
+
+### Step 1: Physical Deletion (MOR Tables Only)
+**Check if your table is MOR or COW:**
+```sql
+-- Check table properties
+DESCRIBE EXTENDED your_table;
+-- Look for 'write.delete.mode' = 'merge-on-read' (MOR) or 'copy-on-write' (COW)
+-- if write.delete.mode isn't set, Spark defaults to COW (Copy-on-Write)
+```
+
+**MOR (Merge-on-Read)**: Deleted rows remain in data files until rewritten
+
+**COW (Copy-on-Write)**: Data files are immediately rewritten with deletes
+
+```sql
+-- For MOR tables only - rewrite data files to physically purge deleted data
+-- This applies to ALL operational deletes (GDPR, data cleanup, etc.)
+CALL your_catalog.system.rewrite_data_files(
+    table => 'your_schema.your_table',
+    options => map('rewrite-all', 'true')
+);
+CALL your_catalog.system.rewrite_position_delete_files(
+    table => 'your_schema.your_table',
+    options => map('rewrite-all', 'true')
+);
+```
+
+### Step 2: Expire Snapshots (All Tables)
+```sql
+-- ⚠️ WARNING: Use timestamp older than your longest query runtime
+-- This prevents breaking active queries that might reference old snapshots
+CALL your_catalog.system.expire_snapshots('your_schema.your_table', TIMESTAMP '2024-01-01 00:00:00');
+```
+
+### Step 3: Clean Orphaned Files (All Tables)
+```sql
+-- PySpark has built-in protection for files <3 days old
+-- Still safe to run immediately after GDPR request, or wait a few days for maintenance
+CALL your_catalog.system.remove_orphan_files(
+    table => 'your_schema.your_table',
+    older_than => TIMESTAMP '2024-01-01 00:00:00'
+);
+```
+
+### ⚠️ Critical Warnings
+- **Timing**: Expire snapshots older than your longest query runtime to avoid breaking active queries
+- **MOR vs COW**: Only MOR tables need Step 1 (rewrite data files)
+- **Safety**: PySpark protects files <3 days old from orphaned file cleanup
+
+## Local Setup
 
 1.  **Start the services**:
     ```bash
@@ -53,83 +132,13 @@ The demonstration covers the following steps:
     docker-compose down
     ```
 
-## Storage Layer Exploration
-
-**For the best learning experience**, keep the MinIO console open while running the notebook to observe how Iceberg manages data:
-
-- **Before starting**: Check that the `warehouse` bucket is empty
-- **During table creation**: Watch metadata files appear
-- **During data seeding**: Observe Parquet files being created  
-- **During PII deletion**: See new snapshots and metadata updates
-- **During maintenance**: Watch old files being removed and new ones created
-
-This real-time exploration shows why simple SQL `DELETE` or `UPDATE` isn't enough for PII compliance in Iceberg.
-
-## Key Takeaways: Why Simple DELETE Isn't Enough
-
-Iceberg's time travel feature means deleted data can still be accessed through historical snapshots. For PII compliance, you need **permanent deletion** using Iceberg maintenance operations.
-
-## Permanent Deletion Commands
-
-### Step 1: Logical Deletion (All Tables)
-```sql
-UPDATE your_table SET pii_column = NULL WHERE condition;
-```
-
-### Step 2: Physical Deletion (MOR Tables Only)
-**Check if your table is MOR or COW:**
-```sql
--- Check table properties
-DESCRIBE EXTENDED your_table;
--- Look for 'write.delete.mode' = 'merge-on-read' (MOR) or 'copy-on-write' (COW)
--- if write.delete.mode isn’t set, Spark defaults to COW (Copy-on-Write)
-```
-
-**MOR (Merge-on-Read)**: Deleted rows remain in data files until rewritten
-**COW (Copy-on-Write)**: Data files are immediately rewritten with deletes
-
-```sql
--- For MOR tables only - rewrite data files to physically purge deleted data
-CALL your_catalog.system.rewrite_data_files(
-    table => 'your_schema.your_table',
-    options => map('rewrite-all', 'true')
-);
-CALL your_catalog.system.rewrite_position_delete_files(
-    table => 'your_schema.your_table',
-    options => map('rewrite-all', 'true')
-);
-```
-
-### Step 3: Expire Snapshots (All Tables)
-```sql
--- ⚠️ WARNING: Use timestamp older than your longest query runtime
--- This prevents breaking active queries that might reference old snapshots
-CALL your_catalog.system.expire_snapshots('your_schema.your_table', TIMESTAMP '2024-01-01 00:00:00');
-```
-
-### Step 4: Clean Orphaned Files (All Tables)
-```sql
--- PySpark has built-in protection for files <3 days old
--- Still safe to run immediately after GDPR request, or wait a few days for maintenance
-CALL your_catalog.system.remove_orphan_files(
-    table => 'your_schema.your_table',
-    older_than => TIMESTAMP '2024-01-01 00:00:00'
-);
-```
-
-### ⚠️ Critical Warnings
-- **Timing**: Expire snapshots older than your longest query runtime to avoid breaking active queries
-- **MOR vs COW**: Only MOR tables need Step 2 (rewrite data files)
-- **Safety**: PySpark protects files <3 days old from orphaned file cleanup
-
-# Extra JAR Dependencies for Spark + Iceberg + MinIO
+### Extra JAR Dependencies for Spark + Iceberg + MinIO
 
 Spark-Iceberg images do **not** include:
 - **Hadoop S3A** → required to use `s3://` with MinIO/S3.
 
-## Required JARs
+#### Required JARs
 
-### Hadoop S3A (match Hadoop 3.3.4 in container)
 ```bash
 mkdir -p jars
 
@@ -138,9 +147,9 @@ curl -L -o jars/hadoop-aws-3.3.4.jar \
 
 curl -L -o jars/aws-java-sdk-bundle-1.12.262.jar \
   https://repo1.maven.org/maven2/com/amazonaws/aws-java-sdk-bundle/1.12.262/aws-java-sdk-bundle-1.12.262.jar
-````
+```
 
-## Mount in `docker-compose.yml`
+#### Mount in `docker-compose.yml`
 
 ```yaml
 volumes:
